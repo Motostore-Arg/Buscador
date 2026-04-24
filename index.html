@@ -530,7 +530,7 @@ body {
 
 .cart-col-headers {
   display: grid;
-  grid-template-columns: 1fr 160px 80px 110px 90px 110px 110px 42px;
+  grid-template-columns: 1fr 140px 80px 100px 70px 110px 100px 110px 110px 42px;
   gap: 10px;
   padding: 0 16px;
   font-size: 10px;
@@ -554,7 +554,7 @@ body {
   border-radius: 10px;
   padding: 12px 16px;
   display: grid;
-  grid-template-columns: 1fr 160px 80px 110px 90px 110px 110px 42px;
+  grid-template-columns: 1fr 140px 80px 100px 70px 110px 100px 110px 110px 42px;
   gap: 10px;
   align-items: center;
   animation: slideIn 0.2s ease;
@@ -638,8 +638,8 @@ body {
 
 .totals-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 14px;
   margin-bottom: 20px;
 }
 
@@ -811,6 +811,9 @@ body {
       <span class="tc-sep">|</span>
       <label>Impuestos %</label>
       <input type="number" class="imp-input" id="impInput" value="35" min="0" step="1">
+      <span class="tc-sep">|</span>
+      <label>Margen %</label>
+      <input type="number" class="imp-input" id="margenInput" value="50" min="0" step="1" style="border-color:#a855f7;">
     </div>
   </div>
 
@@ -828,7 +831,9 @@ body {
       <div style="text-align:right;" class="hide-mob">P. UNIT USD</div>
       <div style="text-align:right;" class="hide-mob">MON.</div>
       <div style="text-align:right;">P. UNIT ARS</div>
-      <div style="text-align:right;">SUBTOTAL ARS</div>
+      <div style="text-align:right;" class="hide-mob">+ IMP.</div>
+      <div style="text-align:right;">PRECIO VENTA</div>
+      <div style="text-align:right;">SUBTOTAL</div>
       <div></div>
     </div>
     <div id="cartItems"></div>
@@ -850,6 +855,11 @@ body {
           <div class="total-card-label">Total ARS + Impuestos</div>
           <div class="total-card-value" style="color:var(--red);" id="totARSimp">$ 0</div>
           <div class="total-card-sub" id="totImpUsed">Imp: 35%</div>
+        </div>
+        <div class="total-card" style="border-color:#a855f7;">
+          <div class="total-card-label" style="color:#a855f7;">💰 Precio de Venta</div>
+          <div class="total-card-value" style="color:#a855f7;font-size:18px;" id="totVenta">$ 0</div>
+          <div class="total-card-sub" id="totMargenUsed">Margen: 50%</div>
         </div>
       </div>
       <div class="cart-actions">
@@ -1048,6 +1058,7 @@ function updateCartBadge(){
 function getTotals(){
   const tc=parseFloat(document.getElementById('tcInput').value)||1500;
   const imp=parseFloat(document.getElementById('impInput').value)||35;
+  const margen=parseFloat(document.getElementById('margenInput').value)||50;
   let totalUSD=0, totalARS=0;
   let items=0;
   for(const key in cart){
@@ -1060,7 +1071,8 @@ function getTotals(){
     items+=qty;
   }
   const totalARSimp=totalARS*(1+imp/100);
-  return {totalUSD,totalARS,totalARSimp,tc,imp,items};
+  const totalVenta=totalARSimp*(1+margen/100);
+  return {totalUSD,totalARS,totalARSimp,totalVenta,tc,imp,margen,items};
 }
 
 function renderCart(){
@@ -1072,6 +1084,7 @@ function renderCart(){
 
   const tc=parseFloat(document.getElementById('tcInput').value)||1500;
   const imp=parseFloat(document.getElementById('impInput').value)||35;
+  const margen=parseFloat(document.getElementById('margenInput').value)||50;
 
   const html=keys.map(key=>{
     const {item,qty}=cart[key];
@@ -1079,7 +1092,9 @@ function renderCart(){
     const isUSD=item.m==='USD'||!item.m;
     const usdVal=isUSD?p:p/tc;
     const arsUnit=usdVal*tc;
-    const arsTotal=arsUnit*qty;
+    const arsImp=arsUnit*(1+imp/100);
+    const arsVenta=arsImp*(1+margen/100);
+    const arsSubtotal=arsVenta*qty;
     const fmtUSD=v=>v>0?v.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
     const fmtARS=v=>v>0?'$ '+v.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0}):'—';
     const monClass=item.m==='USD'?'currency-usd':item.m==='ARS'?'currency-ars':'currency-empty';
@@ -1099,7 +1114,9 @@ function renderCart(){
       <div class="cart-num green hide-mob">${fmtUSD(usdVal)}</div>
       <div class="hide-mob" style="text-align:right;"><span class="currency-badge ${monClass}">${escapeHtml(item.m||'—')}</span></div>
       <div class="cart-num gold">${fmtARS(arsUnit)}</div>
-      <div class="cart-num red">${fmtARS(arsTotal)}</div>
+      <div class="cart-num hide-mob" style="color:#a855f7;">${fmtARS(arsImp)}</div>
+      <div class="cart-num" style="color:#38bdf8;">${fmtARS(arsVenta)}</div>
+      <div class="cart-num red">${fmtARS(arsSubtotal)}</div>
       <button class="remove-btn" onclick="removeFromCart('${escapeHtml(key)}')">✕</button>
     </div>`;
   }).join('');
@@ -1109,15 +1126,17 @@ function renderCart(){
 }
 
 function updateTotals(){
-  const {totalUSD,totalARS,totalARSimp,tc,imp,items}=getTotals();
+  const {totalUSD,totalARS,totalARSimp,totalVenta,tc,imp,margen,items}=getTotals();
   const fmtUSD=v=>v.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtARS=v=>Math.round(v).toLocaleString('es-AR');
   document.getElementById('totUSD').textContent='USD '+fmtUSD(totalUSD);
   document.getElementById('totARSbase').textContent='$ '+fmtARS(totalARS);
   document.getElementById('totARSimp').textContent='$ '+fmtARS(totalARSimp);
+  document.getElementById('totVenta').textContent='$ '+fmtARS(totalVenta);
   document.getElementById('totItemsCount').textContent=items+' artículo'+(items!==1?'s':'');
   document.getElementById('totTCUsed').textContent='TC: '+tc.toLocaleString('es-AR');
   document.getElementById('totImpUsed').textContent='Imp: '+imp+'%';
+  document.getElementById('totMargenUsed').textContent='Margen: '+margen+'%';
 }
 
 function changeCartQty(key,delta){
@@ -1156,7 +1175,7 @@ function clearCart(){
 }
 
 function buildCartText(){
-  const {totalUSD,totalARS,totalARSimp,tc,imp,items}=getTotals();
+  const {totalUSD,totalARS,totalARSimp,totalVenta,tc,imp,margen,items}=getTotals();
   const fmtUSD=v=>v.toLocaleString('es-AR',{minimumFractionDigits:2});
   const fmtARS=v=>Math.round(v).toLocaleString('es-AR');
   let lines=[];
@@ -1182,6 +1201,7 @@ function buildCartText(){
   lines.push(`TOTAL USD (sin imp.):    USD ${fmtUSD(totalUSD)}`);
   lines.push(`TOTAL ARS (sin imp.):    $ ${fmtARS(totalARS)}  (TC: ${tc})`);
   lines.push(`TOTAL ARS + ${imp}% imp.:  $ ${fmtARS(totalARSimp)}`);
+lines.push(`PRECIO DE VENTA (+${margen}% margen): $ ${fmtARS(totalVenta)}`);
   lines.push('');
   lines.push('─────────────────────────────────────────');
   lines.push('Moto Store – motostore@hondaservicio.com.ar');
@@ -1209,6 +1229,7 @@ function copyCart(){
 // TC/IMP change → recalc
 document.getElementById('tcInput').addEventListener('input',()=>{if(document.getElementById('page-cart').classList.contains('active'))renderCart();});
 document.getElementById('impInput').addEventListener('input',()=>{if(document.getElementById('page-cart').classList.contains('active'))renderCart();});
+document.getElementById('margenInput').addEventListener('input',()=>{if(document.getElementById('page-cart').classList.contains('active'))renderCart();});
 
 // Search events
 document.getElementById('searchInput').addEventListener('input',()=>{clearTimeout(debounceTimer);debounceTimer=setTimeout(search,120);});
@@ -1224,6 +1245,7 @@ const HONDA_LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAkACQAAD/4QECRXhpZ
 function renderPrintDoc() {
   const tc = parseFloat(document.getElementById('tcInput').value) || 1500;
   const imp = parseFloat(document.getElementById('impInput').value) || 35;
+  const margen = parseFloat(document.getElementById('margenInput').value) || 50;
   const now = new Date();
   const fecha = now.toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
   const hora = now.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
@@ -1255,11 +1277,14 @@ function renderPrintDoc() {
       <td class="right mono green">${fmtN(usdVal)}</td>
       <td class="center"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:${item.m==='USD'?'#d4edda':'#fff3cd'};color:${item.m==='USD'?'#155724':'#856404'}">${escapeHtml(item.m||'—')}</span></td>
       <td class="right mono gold">${fmtN(arsUnit)}</td>
-      <td class="right mono red">${fmtN(arsTotal)}</td>
+      <td class="right mono" style="color:#c0392b;">${fmtN(arsUnit*(1+imp/100))}</td>
+      <td class="right mono" style="color:#7c3aed;font-weight:700;">${fmtN(arsUnit*(1+imp/100)*(1+margen/100))}</td>
+      <td class="right mono red">${fmtN(arsTotal*(1+imp/100)*(1+margen/100))}</td>
     </tr>`;
   });
 
   const totalARSimp = totalARS * (1 + imp/100);
+  const totalVentaPrint = totalARSimp * (1 + margen/100);
 
   const doc = `<div class="pdoc">
     <div class="pdoc-header">
@@ -1300,8 +1325,10 @@ function renderPrintDoc() {
           <th class="center" style="width:50px;">CANT.</th>
           <th class="right" style="width:100px;">P.UNIT USD</th>
           <th class="center" style="width:55px;">MON.</th>
-          <th class="right" style="width:110px;">P.UNIT ARS</th>
-          <th class="right" style="width:120px;">SUBTOTAL ARS</th>
+          <th class="right" style="width:100px;">P.UNIT ARS</th>
+          <th class="right" style="width:100px;">+ IMP.</th>
+          <th class="right" style="width:110px;">P.VENTA</th>
+          <th class="right" style="width:110px;">SUBTOTAL</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1312,7 +1339,9 @@ function renderPrintDoc() {
         <tr><td>Subtotal USD (sin imp.)</td><td style="color:#1a7a4a;">${fmtUSD(totalUSD)}</td></tr>
         <tr><td>Subtotal ARS (sin imp.)</td><td style="color:#b8860b;">${fmtARS(totalARS)}</td></tr>
         <tr class="highlight"><td>Impuestos (${imp}%)</td><td>${fmtARS(totalARS * imp/100)}</td></tr>
-        <tr class="total-final"><td><strong>TOTAL ARS + IMPUESTOS</strong></td><td>${fmtARS(totalARSimp)}</td></tr>
+        <tr><td>Subtotal ARS + Impuestos</td><td style="color:#c0392b;">${fmtARS(totalARSimp)}</td></tr>
+        <tr class="highlight" style="background:#f3e8ff;"><td>Margen de ganancia (${margen}%)</td><td style="color:#7c3aed;">${fmtARS(totalARSimp * margen/100)}</td></tr>
+        <tr class="total-final"><td><strong>💰 PRECIO DE VENTA FINAL</strong></td><td style="color:#c084fc;font-size:16px;">${fmtARS(totalVentaPrint)}</td></tr>
       </table>
     </div>
     `}
